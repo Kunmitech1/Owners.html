@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Owner Dashboard</title>
+<!-- Chart.js & Firebase -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-database-compat.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--navy:#0f2744;--navy2:#1e3a5f;--green:#16a34a;--amber:#d97706;--rose:#be185d;--red:#dc2626;--slate:#64748b;--bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#0f172a;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);min-height:100vh;color:var(--text)}
+.app{max-width:560px;margin:0 auto;background:var(--bg);min-height:100vh;padding-bottom:100px}
+
+.header{background:linear-gradient(135deg,var(--navy),var(--navy2));padding:24px 22px 18px;color:#fff}
+.header-top{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.header-icon{width:40px;height:40px;background:rgba(255,255,255,0.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem}
+.header h1{font-size:1.2rem;font-weight:800}
+.header-date{font-size:0.8rem;opacity:0.75;margin-left:52px}
+
+.nav{display:flex;gap:8px;padding:12px 16px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.nav button{flex:1;padding:10px 6px;border:none;border-radius:12px;background:var(--bg);color:var(--slate);font-size:0.78rem;font-weight:700;cursor:pointer;transition:all 0.2s}
+.nav button.active{background:var(--navy);color:#fff}
+
+.card{background:var(--card);border-radius:20px;padding:20px;margin:16px 18px;box-shadow:0 1px 6px rgba(0,0,0,0.07)}
+.section-label{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat-box{border-radius:16px;padding:16px 14px;text-align:center;border:1.5px solid var(--border)}
+.stat-box.green{background:#f0fdf4;border-color:#bbf7d0}
+.stat-box.amber{background:#fffbeb;border-color:#fde68a}
+.stat-box.rose{background:#fdf2f8;border-color:#fbcfe8}
+.stat-box.red{background:#fef2f2;border-color:#fecaca}
+.stat-box.blue{background:#eff6ff;border-color:#bfdbfe}
+.stat-num{font-size:1.8rem;font-weight:900;line-height:1}
+.stat-box.green .stat-num{color:var(--green)}
+.stat-box.amber .stat-num{color:var(--amber)}
+.stat-box.rose .stat-num{color:var(--rose)}
+.stat-box.red .stat-num{color:var(--red)}
+.stat-box.blue .stat-num{color:#2563eb}
+.stat-label{font-size:0.7rem;color:var(--slate);margin-top:6px;font-weight:600;line-height:1.3}
+
+.alert{padding:12px 16px;border-radius:12px;margin:12px 18px;font-size:0.84rem;font-weight:600;display:flex;align-items:flex-start;gap:10px}
+.alert-icon{font-size:1rem;flex-shrink:0;margin-top:2px}
+.alert.danger{background:#fef2f2;color:var(--red);border-left:4px solid var(--red)}
+.alert.warning{background:#fffbeb;color:#92400e;border-left:4px solid #f59e0b}
+.alert.success{background:#f0fdf4;color:#166534;border-left:4px solid var(--green)}
+
+.group-tabs,.range-tabs{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:2px}
+.group-tab,.range-tab{padding:8px 18px;border-radius:24px;border:1.5px solid var(--border);background:var(--bg);font-size:0.78rem;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;color:var(--slate)}
+.group-tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.range-tab.active{background:var(--green);color:#fff;border-color:var(--green)}
+
+.data-row{display:flex;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);gap:12px}
+.worker-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}
+.avatar-sm{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.9rem;font-weight:800;flex-shrink:0}
+.worker-info{flex:1}
+.worker-name{font-weight:700;font-size:0.9rem}
+.worker-meta{font-size:0.73rem;color:var(--slate);margin-top:2px}
+.remove-btn{background:#fef2f2;color:var(--red);border:none;padding:8px 14px;border-radius:10px;font-size:0.74rem;font-weight:700;cursor:pointer}
+
+.form-group{margin-bottom:18px}
+.form-label{display:block;font-size:0.8rem;font-weight:700;margin-bottom:6px;color:var(--text)}
+.form-input,select.form-input{width:100%;padding:15px 16px;border:2px solid var(--border);border-radius:12px;font-size:0.95rem;font-family:inherit;background:#fff}
+.form-input:focus,select.form-input:focus{outline:none;border-color:var(--navy)}
+.add-row{display:flex;gap:10px;align-items:flex-end}
+.add-row .form-input{flex:1}
+
+.btn{width:100%;padding:16px;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:10px;transition:opacity 0.2s}
+.btn:active{opacity:0.85}
+.btn-primary{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff}
+.btn-secondary{background:#fff;color:var(--text);border:2px solid var(--border)}
+.btn-sm{width:auto;padding:10px 20px;margin-top:0}
+
+.report-box{background:#f8fafc;border:1px dashed var(--border);border-radius:12px;padding:18px;font-family:'Courier New',monospace;font-size:0.75rem;white-space:pre-wrap;max-height:340px;overflow-y:auto;line-height:1.7}
+
+.timeline-item{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+.t-dot{width:10px;height:10px;border-radius:50%;background:var(--green);margin-top:6px;flex-shrink:0}
+.t-dot.danger{background:var(--red)}
+.t-body{flex:1}
+.t-title{font-weight:700;font-size:0.88rem;line-height:1.4}
+.t-desc{font-size:0.76rem;color:var(--slate);margin-top:3px;line-height:1.4}
+.t-time{font-size:0.7rem;color:var(--slate);white-space:nowrap;text-align:right;line-height:1.4}
+
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:560px;background:#fff;border-top:1px solid var(--border);display:flex;padding:10px 0 22px;z-index:200;box-shadow:0 -2px 8px rgba(0,0,0,0.06)}
+.bottom-nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:none;background:none;color:var(--slate);font-size:0.64rem;font-weight:600;cursor:pointer;padding:4px 0}
+.bottom-nav button.active{color:var(--navy)}
+.nav-icon{font-size:1.3rem;line-height:1}
+
+.hidden{display:none !important}
+.empty-state{text-align:center;padding:40px 20px;color:var(--slate);font-size:0.9rem}
+.chart-container{margin:24px 0;position:relative;height:220px;width:100%}
+.group-header{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+.totals-card{background:linear-gradient(135deg,#0f2744,#1e3a5f);border-radius:20px;padding:20px;margin:16px 18px;color:#fff}
+.totals-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.total-item{text-align:center;background:rgba(255,255,255,0.1);border-radius:12px;padding:12px 8px}
+.total-num{font-size:1.4rem;font-weight:900;line-height:1}
+.total-label{font-size:0.65rem;opacity:0.75;margin-top:4px;font-weight:600;line-height:1.2}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="header">
+  <div class="header-top"><div class="header-icon">🏠</div><h1>Owner Dashboard</h1></div>
+  <div class="header-date" id="headerDate">Loading…</div>
+</div>
+
+<div class="nav">
+  <button class="active" onclick="showTab('overview')" id="nav-overview">📊 Overview</button>
+  <button onclick="showTab('groups')" id="nav-groups">👥 Groups</button>
+  <button onclick="showTab('analytics')" id="nav-analytics">📈 Analytics</button>
+  <button onclick="showTab('reports')" id="nav-reports">📋 Reports</button>
+</div>
+
+<!-- OVERVIEW TAB -->
+<div id="tab-overview">
+  <div id="dashAlerts"></div>
+  <div class="totals-card"><div class="totals-title">📊 All Groups Combined — Today</div><div class="totals-grid" id="combinedTotals"></div></div>
+  <div class="card"><div class="section-label">🐔 Chicken Farm — Today</div><div class="stat-grid" id="chickenStats"></div></div>
+  <div class="card"><div class="section-label">🐇 Rabbit Farm — Today</div><div class="stat-grid" id="rabbitStats"></div></div>
+  <div class="card"><div class="section-label">👥 By Group</div><div class="group-tabs" id="groupFilterTabs"></div><div id="groupView"></div></div>
+  <div class="card"><div class="section-label">🕐 Recent Activity</div><div id="recentLogs"></div></div>
+</div>
+
+<!-- GROUPS TAB -->
+<div id="tab-groups" class="hidden">
+  <div class="card"><div class="section-label">➕ Add Group</div>
+    <div class="form-group"><div class="form-label">Group Name</div><input type="text" class="form-input" id="newGroupName" placeholder="e.g. Group A"></div>
+    <div class="form-group"><div class="form-label">Group PIN</div><input type="text" class="form-input" id="newGroupPin" placeholder="e.g. 1234"></div>
+    <button class="btn btn-primary" onclick="addGroup()">➕ Add Group</button>
+    <div id="groupListManage" style="margin-top:20px"></div>
+  </div>
+  <div class="card"><div class="section-label">➕ Add Worker to Group</div>
+    <div class="form-group"><div class="form-label">Group</div><select class="form-input" id="workerGroupSelect"><option value="">Select group…</option></select></div>
+    <div class="form-group"><div class="form-label">Worker Name</div><div class="add-row"><input type="text" class="form-input" id="newWorkerName" placeholder="e.g. Musa"><button class="btn btn-primary btn-sm" onclick="addWorker()">Add</button></div></div>
+    <div id="allWorkersList"></div>
+  </div>
+</div>
+
+<!-- ANALYTICS TAB -->
+<div id="tab-analytics" class="hidden">
+  <div class="card"><div class="section-label">📈 Key Farm Metrics (<span id="rangeLabel">This Week</span>)</div><div class="stat-grid" id="weeklyKPI"></div></div>
+  <div class="card">
+    <div class="range-tabs">
+      <button class="range-tab active" onclick="setRange('1W')">1W</button><button class="range-tab" onclick="setRange('2W')">2W</button><button class="range-tab" onclick="setRange('1M')">1M</button><button class="range-tab" onclick="setRange('3M')">3M</button><button class="range-tab" onclick="setRange('6M')">6M</button><button class="range-tab" onclick="setRange('1Y')">1Y</button>
+    </div>
+  </div>
+  <div class="card"><div class="section-label">🥚🐇 Yield (Eggs vs Rabbits Sold)</div><div class="chart-container"><canvas id="yieldChart"></canvas></div></div>
+  <div class="card"><div class="section-label">💀 Mortality Trend</div><div class="chart-container"><canvas id="mortalityChart"></canvas></div></div>
+  <div class="card"><div class="section-label">⚖️ Weight Trend (Avg kg per log)</div><div class="chart-container"><canvas id="weightChart"></canvas></div></div>
+  <div class="card">
+    <div class="section-label">💧 Water Intake</div>
+    <div class="range-tabs" style="margin-bottom:8px">
+      <button class="range-tab active" onclick="setWaterRange('daily')">Daily</button>
+      <button class="range-tab" onclick="setWaterRange('weekly')">Weekly</button>
+      <button class="range-tab" onclick="setWaterRange('monthly')">Monthly</button>
+      <button class="range-tab" onclick="setWaterRange('yearly')">Yearly</button>
+    </div>
+    <div class="chart-container"><canvas id="waterChart"></canvas></div>
+  </div>
+</div>
+
+<!-- REPORTS TAB -->
+<div id="tab-reports" class="hidden">
+  <div class="card">
+    <div class="section-label">📋 Generate Report</div>
+    <button class="btn btn-primary" onclick="makeReport('daily')">📄 Today's Full Report</button>
+    <button class="btn btn-primary" style="margin-top:10px" onclick="makeReport('weekly')">📊 7-Day Report</button>
+  </div>
+  <div id="reportBox" class="hidden">
+    <div class="card">
+      <div class="section-label">📄 Report</div>
+      <div class="report-box" id="reportText"></div>
+      <button class="btn btn-primary" style="margin-top:12px" onclick="shareWhatsApp()">📱 WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="bottom-nav">
+  <button class="active" onclick="showTab('overview')"><span class="nav-icon">📊</span>Overview</button>
+  <button onclick="showTab('groups')"><span class="nav-icon">👥</span>Groups</button>
+  <button onclick="showTab('analytics')"><span class="nav-icon">📈</span>Analytics</button>
+  <button onclick="showTab('reports')"><span class="nav-icon">📋</span>Reports</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// FIREBASE CONFIG – REPLACE WITH YOUR OWN
+// ═══════════════════════════════════════════════════════
+<script src="https://www.gstatic.com/firebasejs/10.11.1/<script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+  // Now firebaseConfig is available
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+</script>vailable
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+</script>
+
+// ── helpers ───────────────────────────────────────────
+const RANGE_DAYS = { '1W':7, '2W':14, '1M':30, '3M':90, '6M':180, '1Y':365 };
+
+function todayStr(){ return new Date().toDateString(); }
+function fmt(n){ return Number(n).toLocaleString(); }
+function sum(arr,key){ return arr.reduce((s,l)=>s+(parseFloat(l[key])||0),0); }
+
+// ── global state ─────────────────────────────────────
+var activeGroupFilter='all';
+var charts = {};
+var activeRange = '1W';
+var waterRange = 'daily';
+
+// ── init ──────────────────────────────────────────────
+function init(){
+  document.getElementById('headerDate').textContent=
+    new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  // Real-time listeners
+  db.ref('logs').on('value', snap => {
+    updateOverview();
+    if (!document.getElementById('tab-analytics').classList.contains('hidden')) updateAnalytics();
+  });
+  db.ref('groups').on('value', snap => {
+    renderGroupManage();
+    updateOverview();
+  });
+  db.ref('workers').on('value', snap => {
+    renderGroupManage();
+    if (!document.getElementById('tab-overview').classList.contains('hidden')) updateOverview();
+  });
+  updateOverview();
+  renderGroupManage();
+}
+
+// ── data access (async) ──────────────────────────────
+async function getLogs(){ const s=await db.ref('logs').once('value'); return s.val()?Object.values(s.val()):[]; }
+async function getGroups(){ const s=await db.ref('groups').once('value'); return s.val()?Object.values(s.val()):[]; }
+async function getWorkers(){ const s=await db.ref('workers').once('value'); return s.val()?Object.values(s.val()):[]; }
+
+// ── GROUPS management ─────────────────────────────────
+function addGroup(){
+  const name=document.getElementById('newGroupName').value.trim();
+  const pin=document.getElementById('newGroupPin').value.trim();
+  if(!name||!pin){alert('Enter name and PIN');return;}
+  db.ref('groups').push({ id:'g'+Date.now(), name, pin });
+  document.getElementById('newGroupName').value='';
+  document.getElementById('newGroupPin').value='';
+}
+function deleteGroup(key){
+  if(!confirm('Delete this group and its workers?')) return;
+  db.ref('groups/'+key).remove();
+  // also delete workers belonging to this group
+  db.ref('workers').once('value').then(snap=>{
+    const workers=snap.val();
+    if(workers){
+      Object.entries(workers).forEach(([k,w])=>{
+        if(w.groupId===key) db.ref('workers/'+k).remove();
+      });
+    }
+  });
+}
+function addWorker(){
+  const name=document.getElementById('newWorkerName').value.trim();
+  const groupKey=document.getElementById('workerGroupSelect').value;
+  if(!name||!groupKey){alert('Enter worker name and select group');return;}
+  db.ref('workers').push({
+    id:'w'+Date.now(),
+    name,
+    groupId:groupKey,
+    initials:name.charAt(0).toUpperCase()
+  });
+  document.getElementById('newWorkerName').value='';
+}
+function deleteWorker(key){ if(confirm('Remove worker?')) db.ref('workers/'+key).remove(); }
+
+function renderGroupManage(){
+  getGroups().then(groups=>{
+    const sel=document.getElementById('workerGroupSelect');
+    sel.innerHTML='<option value="">Select group…</option>'+
+      groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+    getWorkers().then(workers=>{
+      document.getElementById('groupListManage').innerHTML=groups.length?
+        groups.map(g=>`<div class="worker-row"><div class="avatar-sm">G</div><div class="worker-info"><div class="worker-name">${g.name}</div><div class="worker-meta">PIN: ${g.pin} | ${workers.filter(w=>w.groupId===g.id).length} worker(s)</div></div><button class="remove-btn" onclick="deleteGroup('${g.id}')">🗑 Remove</button></div>`).join(''):
+        '<div class="empty-state">No groups added yet.</div>';
+      document.getElementById('allWorkersList').innerHTML=workers.length?
+        workers.map(w=>{
+          const grp=groups.find(g=>g.id===w.groupId);
+          return `<div class="worker-row"><div class="avatar-sm">${w.initials}</div><div class="worker-info"><div class="worker-name">${w.name}</div><div class="worker-meta">${grp?grp.name:'Unknown group'}</div></div><button class="remove-btn" onclick="deleteWorker('${w.id}')">🗑</button></div>`;
+        }).join(''):
+        '<div class="empty-state">No workers added yet.</div>';
+    });
+  });
+}
+
+// ── OVERVIEW ──────────────────────────────────────────
+function updateOverview(){
+  Promise.all([getLogs(),getGroups(),getWorkers()]).then(([logs,groups,workers])=>{
+    const tl=logs.filter(l=>new Date(l.date).toDateString()===todayStr());
+    const clogs=tl.filter(l=>l.farm==='chicken');
+    const rlogs=tl.filter(l=>l.farm==='rabbit');
+
+    const cBirds=sum(clogs,'birds'), cFeed=sum(clogs,'feedGrams'), cWater=sum(clogs,'waterLitres');
+    const cGood=sum(clogs,'eggsGood'), cCracked=sum(clogs,'eggsCracked'), cShelless=sum(clogs,'eggsShelless'), cBroken=sum(clogs,'eggsBroken');
+    const cCrates=sum(clogs,'cratesSold'), cRevenue=sum(clogs,'cratesRevenue'), cDeaths=sum(clogs,'deaths');
+    const rMale=sum(rlogs,'rMale'), rFemale=sum(rlogs,'rFemale'), rWeaners=sum(rlogs,'rWeaners'), rKits=sum(rlogs,'rKits');
+    const rFeed=sum(rlogs,'feedGrams'), rWater=sum(rlogs,'waterLitres'), rSold=sum(rlogs,'rabbitsSold'), rDeaths=sum(rlogs,'deaths');
+    const rNewKits=sum(rlogs,'newKits');
+
+    document.getElementById('chickenStats').innerHTML=
+      stat('amber',cBirds,'Birds')+stat('green',cGood,'Good Eggs')+stat('',cCrates,'Crates')+stat('',fmt(cRevenue),'Revenue')+
+      stat(cDeaths>0?'red':'','Deaths: '+cDeaths+' | Feed: '+cFeed+'g | Water: '+cWater+'L','',true);
+    document.getElementById('rabbitStats').innerHTML=
+      stat('rose',rMale+rFemale+rWeaners+rKits,'Total')+stat('green',rNewKits,'New Kits')+stat('',rSold,'Sold')+
+      stat(rDeaths>0?'red':'','Deaths: '+rDeaths+' | Feed: '+rFeed+'g | Water: '+rWater+'L','',true);
+
+    document.getElementById('combinedTotals').innerHTML=
+      totalItem(cBirds,'🐔 Birds')+totalItem(cGood,'🥚 Eggs')+totalItem(cCrates,'📦 Crates')+
+      totalItem(rMale+rFemale+rWeaners+rKits,'🐇 Rabbits')+totalItem(rNewKits,'🐣 Kits')+totalItem(rDeaths+cDeaths,'💀 Deaths');
+
+    let alerts='';
+    if(cDeaths>0) alerts+=`<div class="alert danger"><span class="alert-icon">🚨</span>${cDeaths} chicken deaths</div>`;
+    if(rDeaths>0) alerts+=`<div class="alert danger"><span class="alert-icon">🚨</span>${rDeaths} rabbit deaths</div>`;
+    if(!alerts && tl.length>0) alerts=`<div class="alert success"><span class="alert-icon">✅</span>All systems normal — ${tl.length} entries</div>`;
+    if(!tl.length) alerts=`<div class="alert warning"><span class="alert-icon">⚠️</span>No entries today.</div>`;
+    document.getElementById('dashAlerts').innerHTML=alerts;
+
+    // group tabs
+    document.getElementById('groupFilterTabs').innerHTML=
+      `<span class="group-tab ${activeGroupFilter==='all'?'active':''}" onclick="filterGroup('all')">All Groups</span>`+
+      groups.map(g=>`<span class="group-tab ${activeGroupFilter===g.id?'active':''}" onclick="filterGroup('${g.id}')">${g.name}</span>`).join('');
+    renderGroupView(groups,workers,tl);
+
+    // recent activity (filter unknown groups)
+    let recentHtml='';
+    if(logs.length===0){
+      recentHtml='<div class="empty-state">No recent farm activity.</div>';
+    } else {
+      recentHtml=logs.slice().reverse().filter(l=>groups.some(g=>g.id===l.groupId)).slice(0,12).map(l=>{
+        const t=new Date(l.date).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+        const d=new Date(l.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        const grpName=groups.find(g=>g.id===l.groupId)?.name||'Unknown';
+        const worker=l.workerName||'Worker';
+        const farmEmoji=l.farm==='chicken'?'🐔':'🐇';
+        let desc='', details='';
+        if(l.farm==='chicken'){
+          desc=`${worker} — ${l.birds||0} birds, ${l.eggsGood||0} good eggs`;
+          details=`Cracked: ${l.eggsCracked||0}, Shelless: ${l.eggsShelless||0}, Broken: ${l.eggsBroken||0}, Crates: ${l.cratesSold||0} (₦${fmt(l.cratesRevenue||0)}), Feed: ${l.feedGrams||0}g, Water: ${l.waterLitres||0}L`;
+          if(l.feedTreatment) details+=` | 💊 Feed: ${l.feedTreatment}`;
+          if(l.waterTreatment) details+=` | 💊 Water: ${l.waterTreatment}`;
+          if(l.deaths>0) details+=` | Deaths: ${l.deaths}${l.cause?' ('+l.cause+')':''}`;
+        } else {
+          desc=`${worker} — ♂${l.rMale||0} ♀${l.rFemale||0} W:${l.rWeaners||0} K:${l.rKits||0}`;
+          details=`Feed: ${l.feedType||''} ${l.feedGrams||0}g, Water: ${l.waterLitres||0}L`;
+          if(l.feedTreatment) details+=` | 💊 Feed: ${l.feedTreatment}`;
+          if(l.waterTreatment) details+=` | 💊 Water: ${l.waterTreatment}`;
+          if(l.weight) details+=` | Weight: ${l.weight}kg (Wk ${l.weekNum||'?'})${l.weightTreatment?' 💊 Weight: '+l.weightTreatment:''}`;
+          details+=` | Litters: ${l.litters||0}, Kits: ${l.newKits||0}, Sold: ${l.rabbitsSold||0}`;
+          if(l.deaths>0) details+=` | Deaths: ${l.deaths} (♂${l.dMale||0} ♀${l.dFemale||0} W:${l.dWeaners||0} K:${l.dKits||0})${l.cause?' ('+l.cause+')':''}`;
+        }
+        return `<div class="timeline-item">
+          <div class="t-dot ${l.deaths>0?'danger':''}"></div>
+          <div class="t-body"><div class="t-title">${farmEmoji} ${desc}</div><div class="t-desc">${details}</div><div style="font-size:0.7rem;color:var(--slate);margin-top:2px">${grpName}</div></div>
+          <div class="t-time"><div>${d}</div><div>${t}</div></div></div>`;
+      }).join('');
+    }
+    document.getElementById('recentLogs').innerHTML=recentHtml;
+  });
+}
+
+function filterGroup(id){ activeGroupFilter=id; updateOverview(); }
+
+function renderGroupView(groups,workers,tl){
+  const target = activeGroupFilter==='all' ? groups : groups.filter(g=>g.id===activeGroupFilter);
+  if(!target.length){ document.getElementById('groupView').innerHTML='<div class="empty-state">No groups.</div>'; return; }
+  let html='';
+  target.forEach(g=>{
+    const gLogs=tl.filter(l=>l.groupId===g.id);
+    html+=`<div style="margin-bottom:24px">
+      <div class="group-header"><div><div class="group-header-name">${g.name}</div><div class="group-header-sub">${gLogs.length} entries</div></div><div class="group-total-badge">${gLogs.length} logs</div></div>`;
+    const chickenLogs=gLogs.filter(l=>l.farm==='chicken');
+    const rabbitLogs=gLogs.filter(l=>l.farm==='rabbit');
+    if(chickenLogs.length){
+      html+=`<div style="background:#fffbeb;border-radius:14px;padding:14px;margin-bottom:12px">
+        <div style="font-weight:800;color:#d97706;margin-bottom:10px">🐔 Chicken</div>`;
+      chickenLogs.forEach(l=>{
+        html+=`<div class="data-row"><span class="data-row-label" style="flex:1">${l.workerName}</span>
+          <span class="data-row-val" style="font-size:0.82rem">Birds:${l.birds} Eggs:${l.eggsGood} Feed:${l.feedGrams}g Water:${l.waterLitres}L${l.feedTreatment?' 💊'+l.feedTreatment:''}${l.waterTreatment?' 💊'+l.waterTreatment:''}</span></div>`;
+      });
+      html+=`</div>`;
+    }
+    if(rabbitLogs.length){
+      html+=`<div style="background:#fdf2f8;border-radius:14px;padding:14px">
+        <div style="font-weight:800;color:#be185d;margin-bottom:10px">🐇 Rabbit</div>`;
+      rabbitLogs.forEach(l=>{
+        html+=`<div class="data-row"><span class="data-row-label" style="flex:1">${l.workerName}</span>
+          <span class="data-row-val" style="font-size:0.82rem">♂${l.rMale} ♀${l.rFemale} W:${l.rWeaners} K:${l.rKits} | ${l.feedType} ${l.feedGrams}g | Water:${l.waterLitres}L${l.feedTreatment?' 💊F:'+l.feedTreatment:''}${l.waterTreatment?' 💊W:'+l.waterTreatment:''}${l.weight?' | ⚖️'+l.weight+'kg Wk'+l.weekNum+(l.weightTreatment?' 💊Wt:'+l.weightTreatment:''):''} | Sold:${l.rabbitsSold} | Deaths:${l.deaths} (♂${l.dMale} ♀${l.dFemale} W:${l.dWeaners} K:${l.dKits})</span></div>`;
+      });
+      html+=`</div>`;
+    }
+    html+=`</div>`;
+  });
+  document.getElementById('groupView').innerHTML=html;
+}
+
+function stat(cls,num,label,wide){
+  if(wide) return `<div class="stat-box ${cls||''}" style="grid-column:span 2;text-align:left;display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.84rem;font-weight:600;color:var(--slate)">${label}</span></div>`;
+  return `<div class="stat-box ${cls||''}"><div class="stat-num">${num}</div><div class="stat-label">${label}</div></div>`;
+}
+function totalItem(num,label){ return `<div class="total-item"><div class="total-num">${num}</div><div class="total-label">${label}</div></div>`; }
+
+// ── ANALYTICS ─────────────────────────────────────────
+function setRange(range){ activeRange=range; document.querySelectorAll('.range-tab').forEach(b=>b.classList.remove('active')); document.querySelector(`.range-tab[onclick="setRange('${range}')"]`).classList.add('active'); updateAnalytics(); }
+function setWaterRange(r){ waterRange=r; updateWaterChart(); }
+
+async function updateAnalytics(){
+  const logs = await getLogs();
+  if(logs.length===0){ destroyAllCharts(); document.getElementById('weeklyKPI').innerHTML='<div class="empty-state">No data recorded yet.</div>'; return; }
+  const daysBack = RANGE_DAYS[activeRange]||7;
+  const startDate = new Date(); startDate.setDate(startDate.getDate()-daysBack); startDate.setHours(0,0,0,0);
+  const periodLogs = logs.filter(l => new Date(l.date) >= startDate);
+  const days = []; for(let i=daysBack-1;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); days.push(d.toDateString()); }
+  const totalEggs = sum(periodLogs.filter(l=>l.farm==='chicken'),'eggsGood');
+  const totalRabbitsSold = sum(periodLogs.filter(l=>l.farm==='rabbit'),'rabbitsSold');
+  const totalDeathsC = sum(periodLogs.filter(l=>l.farm==='chicken'),'deaths');
+  const totalDeathsR = sum(periodLogs.filter(l=>l.farm==='rabbit'),'deaths');
+  const totalFeedKg = (sum(periodLogs,'feedGrams')/1000).toFixed(1);
+  const totalWater = sum(periodLogs,'waterLitres').toFixed(1);
+  document.getElementById('rangeLabel').textContent = activeRange==='1W'?'This Week':activeRange==='2W'?'Last 2 Weeks':activeRange==='1M'?'This Month':activeRange==='3M'?'Last 3 Months':activeRange==='6M'?'Last 6 Months':'This Year';
+  document.getElementById('weeklyKPI').innerHTML = stat('green',totalEggs,'Eggs')+stat('amber',totalRabbitsSold,'Rabbits Sold')+stat('red',totalDeathsC+totalDeathsR,'Deaths')+stat('blue',totalFeedKg,'Feed (kg)')+stat('blue',totalWater,'Water (L)');
+
+  const eggData=days.map(day=>sum(periodLogs.filter(l=>l.farm==='chicken'&&new Date(l.date).toDateString()===day),'eggsGood'));
+  const rabbitSoldData=days.map(day=>sum(periodLogs.filter(l=>l.farm==='rabbit'&&new Date(l.date).toDateString()===day),'rabbitsSold'));
+  const chickenDeaths=days.map(day=>sum(periodLogs.filter(l=>l.farm==='chicken'&&new Date(l.date).toDateString()===day),'deaths'));
+  const rabbitDeaths=days.map(day=>sum(periodLogs.filter(l=>l.farm==='rabbit'&&new Date(l.date).toDateString()===day),'deaths'));
+  const labelDays=days.map(d=>new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  const weightLogs=periodLogs.filter(l=>l.weight!=null);
+  const weightData=days.map(day=>{ const w=weightLogs.filter(l=>new Date(l.date).toDateString()===day&&l.weight); return w.length?w[w.length-1].weight:null; });
+
+  destroyAllCharts();
+  charts.yield=new Chart(document.getElementById('yieldChart'),{type:'bar',data:{labels:labelDays,datasets:[{label:'Good Eggs',data:eggData,backgroundColor:'#16a34a',borderRadius:6},{label:'Rabbits Sold',data:rabbitSoldData,backgroundColor:'#be185d',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+  charts.mortality=new Chart(document.getElementById('mortalityChart'),{type:'line',data:{labels:labelDays,datasets:[{label:'Chicken Deaths',data:chickenDeaths,borderColor:'#d97706',backgroundColor:'#fde68a',tension:0.2},{label:'Rabbit Deaths',data:rabbitDeaths,borderColor:'#dc2626',backgroundColor:'#fecaca',tension:0.2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+  charts.weight=new Chart(document.getElementById('weightChart'),{type:'line',data:{labels:labelDays,datasets:[{label:'Avg Weight (kg)',data:weightData,borderColor:'#0f2744',backgroundColor:'rgba(15,39,68,0.1)',tension:0.3,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+  updateWaterChart();
+}
+
+async function updateWaterChart(){
+  const logs = await getLogs();
+  if(logs.length===0) return;
+  const now=new Date();
+  let labels, waterData;
+  if(waterRange==='daily'){
+    const days=[]; for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toDateString());}
+    labels=days.map(d=>new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+    waterData=days.map(day=>sum(logs.filter(l=>new Date(l.date).toDateString()===day),'waterLitres'));
+  } else if(waterRange==='weekly'){
+    const weeks=[]; for(let i=7;i>=0;i--){const start=new Date(now);start.setDate(start.getDate()-i*7-start.getDay());const end=new Date(start);end.setDate(end.getDate()+6);weeks.push({start,end});}
+    labels=weeks.map(w=>'Wk '+new Date(w.start).toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+    waterData=weeks.map(w=>sum(logs.filter(l=>new Date(l.date)>=w.start&&new Date(l.date)<=w.end),'waterLitres'));
+  } else if(waterRange==='monthly'){
+    const months=[]; for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push(d);}
+    labels=months.map(m=>m.toLocaleDateString('en-US',{month:'short'}));
+    waterData=months.map(m=>sum(logs.filter(l=>new Date(l.date).getMonth()===m.getMonth()&&new Date(l.date).getFullYear()===m.getFullYear()),'waterLitres'));
+  } else if(waterRange==='yearly'){
+    const years=[]; for(let i=2;i>=0;i--){const y=now.getFullYear()-i;years.push(y);}
+    labels=years.map(y=>y.toString());
+    waterData=years.map(y=>sum(logs.filter(l=>new Date(l.date).getFullYear()===y),'waterLitres'));
+  }
+  if(charts.water) charts.water.destroy();
+  charts.water=new Chart(document.getElementById('waterChart'),{type:'bar',data:{labels,datasets:[{label:'Water (L)',data:waterData,backgroundColor:'#16a34a',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+}
+
+function destroyAllCharts(){
+  if(charts.yield) charts.yield.destroy();
+  if(charts.mortality) charts.mortality.destroy();
+  if(charts.weight) charts.weight.destroy();
+  if(charts.water) charts.water.destroy();
+}
+
+// ── REPORTS ──────────────────────────────────────────
+async function makeReport(type){
+  const logs=await getLogs();
+  const groups=await getGroups();
+  const today=new Date();
+  let periodLogs, title;
+  if(type==='daily'){
+    periodLogs=logs.filter(l=>new Date(l.date).toDateString()===today.toDateString());
+    title='DAILY REPORT — '+today.toLocaleDateString();
+  } else {
+    const wa=new Date(); wa.setDate(wa.getDate()-7);
+    periodLogs=logs.filter(l=>new Date(l.date)>=wa);
+    title='7-DAY REPORT — ending '+today.toLocaleDateString();
+  }
+  const clogs=periodLogs.filter(l=>l.farm==='chicken');
+  const rlogs=periodLogs.filter(l=>l.farm==='rabbit');
+  let text='╔════════════════════════════════════╗\n║       OWNER DASHBOARD REPORT       ║\n╚════════════════════════════════════╝\n'+title+'\n\n';
+  text+='━━━━━━━━ CHICKEN FARM ━━━━━━━━\nBirds: '+sum(clogs,'birds')+'\nGood Eggs: '+sum(clogs,'eggsGood')+'\nCracked/Shelless/Broken: '+sum(clogs,'eggsCracked')+'/'+sum(clogs,'eggsShelless')+'/'+sum(clogs,'eggsBroken')+'\nCrates: '+sum(clogs,'cratesSold')+' | ₦'+fmt(sum(clogs,'cratesRevenue'))+'\nFeed: '+sum(clogs,'feedGrams')+'g | Water: '+sum(clogs,'waterLitres')+'L\nTreatments: Feed - '+(clogs.filter(l=>l.feedTreatment).map(l=>l.feedTreatment).join(',')||'none')+', Water - '+(clogs.filter(l=>l.waterTreatment).map(l=>l.waterTreatment).join(',')||'none')+'\nDeaths: '+sum(clogs,'deaths')+'\n\n';
+  text+='━━━━━━━━ RABBIT FARM ━━━━━━━━\nM/F/W/K: '+sum(rlogs,'rMale')+'/'+sum(rlogs,'rFemale')+'/'+sum(rlogs,'rWeaners')+'/'+sum(rlogs,'rKits')+'\nNew Litters/Kits: '+sum(rlogs,'litters')+'/'+sum(rlogs,'newKits')+'\nSold: '+sum(rlogs,'rabbitsSold')+'\nFeed: '+sum(rlogs,'feedGrams')+'g ('+(rlogs.filter(l=>l.feedType).map(l=>l.feedType).join(',')||'')+') | Water: '+sum(rlogs,'waterLitres')+'L\nTreatments: Feed - '+(rlogs.filter(l=>l.feedTreatment).map(l=>l.feedTreatment).join(',')||'none')+', Water - '+(rlogs.filter(l=>l.waterTreatment).map(l=>l.waterTreatment).join(',')||'none')+', Weight - '+(rlogs.filter(l=>l.weightTreatment).map(l=>l.weightTreatment).join(',')||'none')+'\nDeaths: '+sum(rlogs,'deaths')+' (♂'+sum(rlogs,'dMale')+' ♀'+sum(rlogs,'dFemale')+' W:'+sum(rlogs,'dWeaners')+' K:'+sum(rlogs,'dKits')+')\n\n';
+  text+='━━━━━━━━ BY GROUP ━━━━━━━━\n'; groups.forEach(g=>{ const gLogs=periodLogs.filter(l=>l.groupId===g.id); text+=g.name+': '+gLogs.length+' entries\n'; });
+  text+='\nGenerated: '+new Date().toLocaleString();
+  document.getElementById('reportText').textContent=text;
+  document.getElementById('reportBox').classList.remove('hidden');
+}
+
+function shareWhatsApp(){
+  window.open('https://wa.me/2348132146857?text='+encodeURIComponent("Good day sir, these are the activities that occurred on the farm today. Please check the dashboard."),'_blank');
+}
+
+// ── TAB SWITCHING ────────────────────────────────────
+function showTab(tab){
+  ['overview','groups','analytics','reports'].forEach(t=>{
+    document.getElementById('tab-'+t).classList.toggle('hidden',t!==tab);
+    document.getElementById('nav-'+t).classList.toggle('active',t===tab);
+  });
+  document.querySelectorAll('.bottom-nav button').forEach((b,i)=>b.classList.toggle('active',['overview','groups','analytics','reports'][i]===tab));
+  if(tab==='overview') updateOverview();
+  if(tab==='groups') renderGroupManage();
+  if(tab==='analytics') updateAnalytics();
+}
+
+init();
+</script>
+</body>
+</html>
